@@ -87,6 +87,7 @@ def add_molecules(
     fig: Figure,
     df: pd.DataFrame,
     smiles_col: str | list[str] = "SMILES",
+    mol_col: RDKit.Chem.rdchem.mol = None,
     show_img: bool = True,
     svg_size: int = 200,
     alpha: float = 0.75,
@@ -175,6 +176,8 @@ def add_molecules(
     app = JupyterDash(__name__)
     if isinstance(smiles_col, str):
         smiles_col = [smiles_col]
+    elif isinstance(mol_col, str):
+        smiles_col = [mol_col] 
 
     if len(smiles_col) > 1:
         menu = dcc.Dropdown(
@@ -225,8 +228,45 @@ def add_molecules(
             df_row = df_curve.iloc[num]
         else:
             df_row = df.iloc[num]
-
+        
         hoverbox_elements = []
+
+        if mol_col:
+            for col in chosen_smiles:
+                mol = df_row[col]
+                buffered = BytesIO()
+                d2d = rdMolDraw2D.MolDraw2DSVG(svg_size, svg_size)
+                opts = d2d.drawOptions()
+                opts.clearBackground = False
+                d2d.DrawMolecule(mol,highlightAtoms=mol.__sssAtoms)
+                d2d.FinishDrawing()
+                img_str = d2d.GetDrawingText()
+                buffered.write(str.encode(img_str))
+                img_str = base64.b64encode(buffered.getvalue())
+                img_str = f"data:image/svg+xml;base64,{repr(img_str)[2:-1]}"
+                # img_str = df_data.query(f"{col} == @smiles")[f"{col}_img"].values[0]
+
+                if len(mol_col) > 1:
+                    hoverbox_elements.append(
+                        html.H2(
+                            f"{col}",
+                            style={
+                                "color": colors[curve_num],
+                                "font-family": fontfamily,
+                                "fontSize": fontsize + 2,
+                            },
+                        )
+                    )
+                hoverbox_elements.append(
+                    html.Img(
+                        src=img_str,
+                        style={
+                            "width": "100%",
+                            "background-color": f"rgba(255,255,255,{mol_alpha})",
+                        },
+                    )
+                )
+
 
         if show_img:
             # The 2D image of the molecule is generated here
